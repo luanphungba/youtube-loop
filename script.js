@@ -165,7 +165,6 @@ class YouTubeLooper {
         const shareableUrl = document.getElementById('shareableUrl');
         shareableUrl.select();
         document.execCommand('copy');
-        alert('URL copied to clipboard!');
     }
 
     resetAll() {
