@@ -27,6 +27,7 @@ class YouTubeLooper {
         document.getElementById('loadButton').addEventListener('click', () => this.loadVideo());
         document.getElementById('copyButton').addEventListener('click', () => this.copyShareableUrl());
         window.addEventListener('load', () => this.getUrlParams());
+        document.getElementById('resetButton').addEventListener('click', () => this.resetAll());
     }
 
     loadVideo() {
@@ -165,6 +166,34 @@ class YouTubeLooper {
         shareableUrl.select();
         document.execCommand('copy');
         alert('URL copied to clipboard!');
+    }
+
+    resetAll() {
+        // Reset all form inputs
+        document.getElementById('videoUrl').value = '';
+        document.getElementById('startTime').value = '';
+        document.getElementById('endTime').value = '';
+        document.getElementById('loopCount').value = '10';
+        
+        // Hide the share URL section if it's visible
+        document.getElementById('shareUrl').style.display = 'none';
+        
+        // Clear the shareable URL input if it exists
+        const shareableUrl = document.getElementById('shareableUrl');
+        if (shareableUrl) {
+            shareableUrl.value = '';
+        }
+        
+        // If there's a YouTube player instance, stop it and clear the player div
+        if (this.player) {
+            this.player.stopVideo();
+            this.player.destroy();
+            this.player = null;
+        }
+        document.getElementById('player').innerHTML = '';
+
+        // Reset the URL without refreshing the page
+        window.history.pushState({}, '', window.location.pathname);
     }
 }
 
