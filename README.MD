@@ -53,7 +53,3 @@ Built with:
 ## Live Demo
 
 Try it here: [YouTube Video Looper](https://youtube-looper.luanphung.com/)
-
-## Local Development
-
-1. Clone the repository:

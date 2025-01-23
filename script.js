@@ -85,7 +85,6 @@ class YouTubeLooper {
                     this.currentLoopCount++;
                     if (this.currentLoopCount >= this.maxLoops) {
                         this.player.pauseVideo();
-                        alert(`Finished ${this.maxLoops} loops!`);
                         clearInterval(this.checkInterval);
                     } else {
                         this.player.seekTo(this.startTime);
@@ -96,9 +95,23 @@ class YouTubeLooper {
     }
 
     extractVideoId(url) {
-        const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
-        const match = url.match(regExp);
-        return (match && match[7].length == 11) ? match[7] : false;
+        // Handle empty or invalid URLs
+        if (!url) return false;
+
+        // Try different URL patterns
+        let match;
+        
+        // Pattern 1: Standard YouTube URLs (watch?v=)
+        const standardPattern = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
+        match = url.match(standardPattern);
+        if (match && match[7].length == 11) return match[7];
+        
+        // Pattern 2: Short URLs (youtu.be/) and mobile app URLs
+        const shortPattern = /^.*(youtu\.be\/|youtube\.com\/shorts\/)([^#&?]*).*/;
+        match = url.match(shortPattern);
+        if (match && match[2].length == 11) return match[2];
+        
+        return false;
     }
 
     convertTimeToSeconds(timeStr) {
