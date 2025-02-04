@@ -1,6 +1,7 @@
-class YouTubeLooper {
+class MediaLooper {
     constructor() {
         this.player = null;
+        this.audioPlayer = null;
         this.startTime = 0;
         this.endTime = 0;
         this.currentLoopCount = 0;
@@ -31,43 +32,47 @@ class YouTubeLooper {
     }
 
     loadVideo() {
-        // Get input values
         const url = document.getElementById('videoUrl').value;
         this.startTime = this.convertTimeToSeconds(document.getElementById('startTime').value) || 0;
         this.endTime = this.convertTimeToSeconds(document.getElementById('endTime').value) || 0;
         this.maxLoops = parseInt(document.getElementById('loopCount').value) || 10;
         this.currentLoopCount = 0;
 
-        // Extract video ID from URL
-        const videoId = this.extractVideoId(url);
-        
-        if (!videoId) {
-            alert('Please enter a valid YouTube URL');
-            return;
-        }
-
-        if (this.player) {
-            // If player exists, load new video
-            this.player.loadVideoById({
-                videoId: videoId,
-                startSeconds: this.startTime
-            });
+        // Check if URL is a direct audio file
+        if (url.match(/\.(mp3|wav|ogg)$/i) || url.includes('mp3')) {
+            this.setupAudioPlayer(url);
         } else {
-            // Create new player
-            this.player = new YT.Player('player', {
-                height: '360',
-                width: '640',
-                videoId: videoId,
-                playerVars: {
-                    start: this.startTime,
-                    autoplay: 1
-                },
-                events: {
-                    'onStateChange': (event) => this.onPlayerStateChange(event)
-                }
-            });
-        }
+            // Extract video ID from URL
+            const videoId = this.extractVideoId(url);
+            
+            if (!videoId) {
+                alert('Please enter a valid YouTube URL');
+                return;
+            }
 
+            if (this.player) {
+                // If player exists, load new video
+                this.player.loadVideoById({
+                    videoId: videoId,
+                    startSeconds: this.startTime
+                });
+            } else {
+                // Create new player
+                this.player = new YT.Player('player', {
+                    height: '360',
+                    width: '640',
+                    videoId: videoId,
+                    playerVars: {
+                        start: this.startTime,
+                        autoplay: 1
+                    },
+                    events: {
+                        'onStateChange': (event) => this.onPlayerStateChange(event)
+                    }
+                });
+            }
+
+        }
         this.generateShareableUrl();
     }
 
@@ -148,12 +153,18 @@ class YouTubeLooper {
     getUrlParams() {
         const urlParams = new URLSearchParams(window.location.search);
         const videoId = urlParams.get('v');
+        const directUrl = urlParams.get('url');
         const start = urlParams.get('start');
         const end = urlParams.get('end');
         const loop = urlParams.get('loop');
 
         if (videoId) {
             document.getElementById('videoUrl').value = 'https://youtube.com/watch?v=' + videoId;
+        } else if (directUrl) {
+            document.getElementById('videoUrl').value = decodeURIComponent(directUrl);
+        }
+
+        if (videoId || directUrl) {
             document.getElementById('startTime').value = this.secondsToTimeStr(parseInt(start) || 0);
             document.getElementById('endTime').value = this.secondsToTimeStr(parseInt(end) || 0);
             document.getElementById('loopCount').value = parseInt(loop) || 10;
@@ -162,15 +173,24 @@ class YouTubeLooper {
     }
 
     generateShareableUrl() {
-        const videoId = this.extractVideoId(document.getElementById('videoUrl').value);
+        const videoUrl = document.getElementById('videoUrl').value;
         const start = this.convertTimeToSeconds(document.getElementById('startTime').value);
         const end = this.convertTimeToSeconds(document.getElementById('endTime').value);
         const loop = document.getElementById('loopCount').value;
 
         const baseUrl = window.location.origin + window.location.pathname;
-        const shareableUrl = `${baseUrl}?v=${videoId}&start=${start}&end=${end}&loop=${loop}`;
         
-        document.getElementById('shareableUrl').value = shareableUrl;
+        if (videoUrl.match(/\.(mp3|wav|ogg)$/i) || videoUrl.includes('mp3')) {
+            // For audio files, use the full URL
+            const shareableUrl = `${baseUrl}?url=${encodeURIComponent(videoUrl)}&start=${start}&end=${end}&loop=${loop}`;
+            document.getElementById('shareableUrl').value = shareableUrl;
+        } else {
+            // For YouTube videos, use video ID
+            const videoId = this.extractVideoId(videoUrl);
+            const shareableUrl = `${baseUrl}?v=${videoId}&start=${start}&end=${end}&loop=${loop}`;
+            document.getElementById('shareableUrl').value = shareableUrl;
+        }
+        
         document.getElementById('shareUrl').style.display = 'block';
     }
 
@@ -178,6 +198,60 @@ class YouTubeLooper {
         const shareableUrl = document.getElementById('shareableUrl');
         shareableUrl.select();
         document.execCommand('copy');
+    }
+
+    setupAudioPlayer(url) {
+        // Clear any existing players
+        if (this.player) {
+            this.player.destroy();
+            this.player = null;
+        }
+        if (this.audioPlayer) {
+            this.audioPlayer.pause();
+            this.audioPlayer = null;
+        }
+
+        // Create audio player
+        this.audioPlayer = new Audio(url);
+        
+        // Create a visible audio element for better control
+        const playerDiv = document.getElementById('player');
+        playerDiv.innerHTML = `
+            <audio controls style="width: 100%;">
+                <source src="${url}" type="audio/mpeg">
+                Your browser does not support the audio element.
+            </audio>
+        `;
+        this.audioPlayer = playerDiv.querySelector('audio');
+        
+        this.audioPlayer.addEventListener('timeupdate', () => this.checkAudioTime());
+        this.audioPlayer.addEventListener('loadedmetadata', () => {
+            // If no end time specified, use audio duration
+            if (!this.endTime) {
+                this.endTime = this.audioPlayer.duration;
+            }
+            this.audioPlayer.currentTime = this.startTime;
+            this.audioPlayer.play();
+        });
+
+        // Handle errors
+        this.audioPlayer.addEventListener('error', (e) => {
+            console.error('Error loading audio:', e);
+            alert('Error loading audio file. Please check the URL and try again.');
+        });
+    }
+
+    checkAudioTime() {
+        if (!this.audioPlayer) return;
+
+        if (this.audioPlayer.currentTime >= this.endTime) {
+            if (this.maxLoops && this.currentLoopCount >= this.maxLoops) {
+                this.audioPlayer.pause();
+                return;
+            }
+            this.currentLoopCount++;
+            this.audioPlayer.currentTime = this.startTime;
+        }
     }
 
     resetAll() {
@@ -206,8 +280,14 @@ class YouTubeLooper {
 
         // Reset the URL without refreshing the page
         window.history.pushState({}, '', window.location.pathname);
+
+        // Add audio player cleanup
+        if (this.audioPlayer) {
+            this.audioPlayer.pause();
+            this.audioPlayer = null;
+        }
     }
 }
 
 // Initialize the app
-const youtubeLooper = new YouTubeLooper(); 
+const mediaLooper = new MediaLooper(); 
